@@ -1,0 +1,16 @@
+{
+  "short_name": "BolaAzul",
+  "name": "Reto Bola Azul",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/564/564415.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "./index.html",
+  "background_color": "#0f0f1a",
+  "display": "standalone",
+  "theme_color": "#0f0f1a"
+}
