@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+      <title>Reto Progresivo: Círculo Móvil</title>
+   <link rel="manifest" href="manifest.json">
+   <meta name="theme-color" content="#0f0f1a">
+   <script>
+     if ('serviceWorker' in navigator) {
+       navigator.serviceWorker.register('./sw.js');
+     }
+   </script>
+   <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #0f0f1a;
+            font-family: 'Segoe UI', sans-serif;
+            touch-action: none;
+            color: white;
+        }
+
+        #highscore-display {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            text-align: center;
+            font-size: 1.2rem;
+            color: #ffcc00;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            z-index: 20;
+        }
+
+        /* El objetivo ahora es dinámico */
+        #target-circle {
+            width: 160px;
+            height: 160px;
+            border: 3px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 50%;
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+        }
+
+        #timer { font-size: 1.5rem; font-weight: bold; }
+        #label { font-size: 0.6rem; opacity: 0.6; }
+
+        #player {
+            width: 25px;
+            height: 25px;
+            background-color: #007bff;
+            border-radius: 50%;
+            position: absolute;
+            box-shadow: 0 0 15px rgba(0, 123, 255, 0.8);
+            z-index: 10;
+        }
+
+        #joystick-container {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 100px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            z-index: 20;
+        }
+
+        #joystick-knob {
+            width: 40px;
+            height: 40px;
+            background: #fff;
+            border-radius: 50%;
+            position: absolute;
+            top: 30px;
+            left: 30px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="highscore-display">Récord: <span id="max-time">0.00</span>s</div>
+
+<div id="game-container">
+    <div id="target-circle">
+        <div id="label">TIEMPO</div>
+        <div id="timer">0.00s</div>
+    </div>
+    <div id="player"></div>
+    <div id="joystick-container">
+        <div id="joystick-knob"></div>
+    </div>
+</div>
+
+<script>
+    const player = document.getElementById('player');
+    const knob = document.getElementById('joystick-knob');
+    const container = document.getElementById('joystick-container');
+    const timerDisplay = document.getElementById('timer');
+    const maxDisplay = document.getElementById('max-time');
+    const target = document.getElementById('target-circle');
+
+    // Estado Jugador
+    let pX = window.innerWidth / 2, pY = window.innerHeight * 0.7;
+    let vX = 0, vY = 0;
+    
+    // Estado Objetivo (Círculo Blanco)
+    let tX = window.innerWidth / 2, tY = window.innerHeight / 2;
+    let tSize = 160;
+    let tAngle = 0; // Para el movimiento errático
+
+    let timeActive = 0;
+    let maxTime = 0;
+    let lastTimestamp = 0;
+    let isDragging = false;
+
+    function update(timestamp) {
+        if (!lastTimestamp) lastTimestamp = timestamp;
+        const dt = (timestamp - lastTimestamp) / 1000;
+        lastTimestamp = timestamp;
+
+        // 1. Mover Jugador
+        pX += vX; pY += vY;
+        pX = Math.max(0, Math.min(window.innerWidth - 25, pX));
+        pY = Math.max(0, Math.min(window.innerHeight - 25, pY));
+        player.style.left = `${pX}px`;
+        player.style.top = `${pY}px`;
+
+        // 2. Lógica de dificultad progresiva
+        if (timeActive > 0) {
+            // Se hace más pequeño (mínimo 60px)
+            tSize = Math.max(60, 160 - (timeActive * 5));
+            
+            // Se mueve lentamente en círculos/ondas
+            tAngle += dt * 2;
+            tX += Math.cos(tAngle) * 0.5;
+            tY += Math.sin(tAngle * 0.5) * 0.5;
+        } else {
+            // Reset de dificultad
+            tSize = 160;
+            tX = window.innerWidth / 2;
+            tY = window.innerHeight / 2;
+        }
+
+        // Aplicar cambios al objetivo
+        target.style.width = `${tSize}px`;
+        target.style.height = `${tSize}px`;
+        target.style.left = `${tX - tSize/2}px`;
+        target.style.top = `${tY - tSize/2}px`;
+
+        // 3. Colisión
+        const dx = (pX + 12.5) - tX;
+        const dy = (pY + 12.5) - tY;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        const isMoving = Math.abs(vX) > 0.1 || Math.abs(vY) > 0.1;
+
+        if (dist < tSize/2 && isMoving) {
+            timeActive += dt;
+            target.style.borderColor = "#007bff";
+            if (timeActive > maxTime) {
+                maxTime = timeActive;
+                maxDisplay.innerText = maxTime.toFixed(2);
+            }
+        } else {
+            timeActive = 0;
+            target.style.borderColor = "rgba(255, 255, 255, 0.2)";
+        }
+
+        timerDisplay.innerText = `${timeActive.toFixed(2)}s`;
+        requestAnimationFrame(update);
+    }
+
+    // Joystick con velocidad lenta (2.5)
+    const handleMove = (e) => {
+        if (!isDragging) return;
+        const touch = e.touches ? e.touches[0] : e;
+        const rect = container.getBoundingClientRect();
+        const cX = rect.left + 50, cY = rect.top + 50;
+        const dX = touch.clientX - cX, dY = touch.clientY - cY;
+        const dist = Math.min(Math.sqrt(dX*dX + dY*dY), 40);
+        const ang = Math.atan2(dY, dX);
+        knob.style.transform = `translate(${Math.cos(ang)*dist}px, ${Math.sin(ang)*dist}px)`;
+        vX = (Math.cos(ang) * dist / 40) * 2.5;
+        vY = (Math.sin(ang) * dist / 40) * 2.5;
+    };
+
+    container.addEventListener('mousedown', () => isDragging = true);
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', () => { isDragging = false; knob.style.transform = 'translate(0,0)'; vX=0; vY=0; });
+    container.addEventListener('touchstart', (e) => { isDragging = true; e.preventDefault(); }, {passive: false});
+    window.addEventListener('touchmove', handleMove, {passive: false});
+    window.addEventListener('touchend', () => { isDragging = false; knob.style.transform = 'translate(0,0)'; vX=0; vY=0; });
+
+    requestAnimationFrame(update);
+</script>
+</body>
+</html>
